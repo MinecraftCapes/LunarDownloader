@@ -14,7 +14,7 @@ var indexUrl;
 var baseUrl;
 
 // Lunar Download request
-let requestJson = '{"hwid":"0","os":"win32","arch":"x64","launcher_version":"12.0.2","version":"1.8","branch":"master","launch_type":"OFFLINE","classifier":"optifine"}'
+let requestJson = `{"hwid":"${Date.now()}","os":"win32","arch":"x64","launcher_version":"12.0.2","version":"1.8","branch":"master","launch_type":"OFFLINE","classifier":"optifine"}`
 
 async function createFolders() {
     var dir = './images';
@@ -45,7 +45,7 @@ async function requestEndpoints() {
 async function downloadAssets() {
     logger.info("Obtaining asset names...")
     let assetResponse = await axios.get(indexUrl)
-    .then((response) => { return response.data })
+    .then((response) => { return response.data.split("\n") })
     .catch((error) => {
         logger.error("Obtaining asset names failed.")
         logger.error(error);
@@ -55,11 +55,12 @@ async function downloadAssets() {
     logger.info("Obtained asset names.")
 
     //Get the total/downloaded values
-    let totalCapes = (assetResponse.match(/assets\/lunar\/cosmetics\/cloaks/g) ||[]).length;
+    assetResponse = assetResponse.filter(value => value.includes("assets/lunar/cosmetics/cloaks") && !value.includes(".mcmeta"));
+    let totalCapes = assetResponse.length;
     let downloadedCape = 0;
 
     //Setup the progress bar
-    logger.info("Downloading capes...")
+    logger.info("Downloading capes, this can take a long time...")
     const progressBar = new cliProgress.SingleBar({
         stopOnComplete: true
     }, cliProgress.Presets.shades_classic);
@@ -68,11 +69,8 @@ async function downloadAssets() {
     })
     progressBar.start(totalCapes, downloadedCape);
 
-    //Split the response into an array by lines
-    let assetData = assetResponse.split("\n");
-
     //Loop through each line
-    for(assetLine of assetData) {
+    for(assetLine of assetResponse) {
         let asset = assetLine.split(" ");
         if(asset[0].includes("assets/lunar/cosmetics/cloaks/")) {
 
@@ -80,15 +78,30 @@ async function downloadAssets() {
             let capeName = asset[0].replaceAll("assets/lunar/cosmetics/cloaks/", "");
             let capeHash = asset[1];
 
+            //We don't want mcmeta files
+            if(capeName.includes(".mcmeta")) continue;
+
+            //Write to a file
             let writer = fs.createWriteStream(`./images/${capeName}`);
             axios.get(`${baseUrl}${capeHash}`, {
-                timeout: 300000,
+                timeout: 10000,
                 responseType: 'stream',
             }).then((response) => {
-                response.data.pipe(writer);
-                convertFile(capeName);
-            }).catch(() => {
-                logger.error(`${baseUrl}${capeHash} Failed to download`)
+                //Pipe to a file
+                let stream = response.data.pipe(writer);
+
+                //Wait for the pipe to finish then convert to a png
+                stream.on('finish', () => {
+                    webp.dwebp(`./images/${capeName}`, `./images/${capeName.replaceAll(".webp", ".png")}`, "-o",logging="-v").then(() => {
+                        fs.unlinkSync(`./images/${capeName}`)
+                    }).catch(error => {
+                        logging.error(error);
+                    });
+                });
+            }).catch((error) => {
+                progressBar.stop();
+                logger.error(`${error.toJSON().message} - ${baseUrl}${capeHash} Failed to download`)
+                return;
             }).finally(() => {
                 //Update the progress bar
                 progressBar.increment();
@@ -98,20 +111,8 @@ async function downloadAssets() {
 }
 
 /**
- * Convert all files to png
+ * Start all requires functions
  */
-function convertFile(capeName) {
-    fs.readdirSync("./images/").forEach((capeName) => {
-        if(capeName.includes(".mcmeta")) return;
-
-        webp.dwebp(`./images/${capeName.replaceAll(".webp", ".png")}`, `./images/${capeName}`, "-o",logging="-v").then((response) => {
-            fs.unlinkSync(`./images/${capeName}`)
-        }).finally(() => {
-            progressBar.increment();
-        });
-    });
-}
-
 async function start() {
     await createFolders();
     await requestEndpoints();

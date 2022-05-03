@@ -80,6 +80,10 @@ async function downloadAssets() {
 
             //We don't want mcmeta files
             if(capeName.includes(".mcmeta")) continue;
+            if(fs.existsSync(`./images/${capeName.replaceAll(".webp", ".png")}`)) {
+                progressBar.increment();
+                continue;
+            }
 
             //Write to a file
             let writer = fs.createWriteStream(`./images/${capeName}`);

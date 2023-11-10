@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/MinecraftCapes/LunarDownloader#readme",
   "dependencies": {
-    "axios": "^0.21.1",
+    "axios": "^1.6.0",
     "cli-progress": "^3.9.0",
     "log4js": "^6.3.0",
     "webp-converter": "^2.3.3"

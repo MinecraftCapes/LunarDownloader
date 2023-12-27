@@ -7,14 +7,26 @@ logger.info("Loading libraries...")
 const axios = require('axios');
 const cliProgress = require('cli-progress');
 const fs = require('fs');
+const os = require('os')
 const webp = require('webp-converter');
+const { v4: uuidv4 } = require('uuid');
+const { log } = require("console");
 
 // Global Variables
 var indexUrl;
 var baseUrl;
 
 // Lunar Download request
-let requestJson = `{"hwid":"${Date.now()}","os":"win32","arch":"x64","launcher_version":"12.0.2","version":"1.8","branch":"master","launch_type":"OFFLINE","classifier":"optifine"}`
+//https://launcherupdates.lunarclientcdn.com/latest.yml
+let requestJson = `{
+    "installation_id": "${uuidv4()}",
+    "os":"${process.platform}",
+    "os_release": "${os.release()}",
+    "arch": "${process.arch}",
+    "branch": "master",
+    "version":"1.8.9",
+    "launcher_version": "3.1.3"
+}`
 
 async function createFolders() {
     var dir = './images';
@@ -29,13 +41,19 @@ async function createFolders() {
  */
 async function requestEndpoints() {
     logger.info("Request endpoints...")
-    await axios.post('https://api.lunarclientprod.com/launcher/launch', requestJson).then((response) => {
+    logger.info(requestJson)
+    await axios.post('https://api.lunarclientprod.com/launcher/launch', requestJson, {
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    }).then((response) => {
         logger.info("Obtained endpoints.")
         indexUrl = response.data.textures.indexUrl
         baseUrl = response.data.textures.baseUrl
     }).catch((error) => {
         logger.error("Obtaining endpoints failed.")
-        logger.error(error);
+        logger.error(error.response.data);
+        process.exit();
     })
 }
 
